@@ -53,6 +53,13 @@ doomsday-train-doors/
 - 胜负条件、映射变化和输入边界均可在实际游玩中验证。
 - 根目录 PDF 与提示词备份齐全，过程可追溯。
 
+## 发布状态
+
+- GitHub 仓库：https://github.com/NyaShark/doomsday-train-doors
+- GitHub Pages：`main` 分支根目录
+- 公开地址：https://nyashark.github.io/doomsday-train-doors/
+- 账号原有自定义域名 `nyashark-rathan.icu` 已无 DNS 记录，因此恢复使用 GitHub Pages 标准域名。
+
 ## 技术说明
 
 - 无构建步骤，原生 HTML、CSS 与 JavaScript。
