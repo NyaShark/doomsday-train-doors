@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e0e">
+  <meta name="description" content="末日车门：30 秒内读取避难门映射，将幸存者送向正确轨道的反应分轨游戏。">
+  <title>末日车门 | DOOMSDAY TRAIN DOORS</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#gameStage">跳到游戏区域</a>
+  <div class="world" id="world">
+    <div class="atmosphere" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="eyebrow">EVACUATION TERMINAL 09 / FINAL GATE</span>
+        <div class="brand-line">
+          <h1>末日车门</h1>
+          <span class="brand-en">DOOMSDAY TRAIN DOORS</span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <div class="system-state" id="systemState">
+          <span class="system-dot" aria-hidden="true"></span>
+          <span id="systemStateText">等待启动</span>
+        </div>
+        <button class="icon-button" id="soundButton" type="button" aria-label="关闭音效" aria-pressed="true">
+          <svg class="icon icon-sound" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z"></path>
+            <path d="M16 8c1.4 1 2 2.3 2 4s-.6 3-2 4"></path>
+            <path d="M18.5 5.5C20.5 7 21.5 9.2 21.5 12s-1 5-3 6.5"></path>
+          </svg>
+          <svg class="icon icon-muted" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z"></path>
+            <path d="m16 9 5 5m0-5-5 5"></path>
+          </svg>
+        </button>
+        <button class="icon-button" id="pauseButton" type="button" aria-label="暂停游戏" disabled>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 5v14M17 5v14"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="game-main">
+      <section class="hud" aria-label="游戏状态">
+        <div class="hud-time">
+          <span class="hud-kicker">LOCKDOWN</span>
+          <strong id="timerValue">30.0</strong>
+          <span class="hud-unit">SEC</span>
+        </div>
+
+        <div class="hud-objective">
+          <div class="objective-head">
+            <span class="hud-kicker">EVACUATED</span>
+            <span class="objective-value"><b id="correctValue">0</b><i>/20</i></span>
+          </div>
+          <div class="objective-track" aria-hidden="true">
+            <span id="objectiveFill"></span>
+          </div>
+        </div>
+
+        <div class="hud-lives">
+          <span class="hud-kicker">INTEGRITY</span>
+          <div class="life-row" id="lifeRow" aria-label="剩余 3 次生命">
+            <span class="life-cell"></span>
+            <span class="life-cell"></span>
+            <span class="life-cell"></span>
+          </div>
+        </div>
+
+        <div class="hud-score">
+          <div>
+            <span class="hud-kicker">SCORE</span>
+            <strong id="scoreValue">0000</strong>
+          </div>
+          <div>
+            <span class="hud-kicker">COMBO</span>
+            <strong><span id="comboValue">0</span><small id="multiplierValue">×1.0</small></strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage" id="gameStage" aria-label="避难门分流区域">
+        <div class="stage-ribbon">
+          <div class="stage-label">
+            <span id="stageLabel">STAGE 01 / PLATFORM</span>
+            <span class="mapping-state" id="mappingState">MAPPING STABLE</span>
+          </div>
+          <div class="signal-line" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="arrival-panel" id="arrivalPanel">
+          <div class="arrival-copy">
+            <span class="eyebrow" id="arrivalKicker">NEXT SURVIVOR</span>
+            <strong id="arrivalTitle">等待救援信号</strong>
+            <span class="arrival-hint" id="arrivalHint">选择同色同形状的避难门</span>
+          </div>
+
+          <div class="survivor-slot" id="survivorSlot" aria-live="polite">
+            <div class="survivor-figure" aria-hidden="true">
+              <span class="survivor-head"></span>
+              <span class="survivor-body"></span>
+              <span class="survivor-badge" id="survivorBadge"></span>
+            </div>
+            <div class="survivor-data">
+              <span class="survivor-code" id="survivorCode">NO SIGNAL</span>
+              <strong id="survivorCombo">待命</strong>
+            </div>
+          </div>
+
+          <div class="arrival-clock">
+            <span id="arrivalClock">--</span>
+            <div class="arrival-track" aria-hidden="true">
+              <span id="arrivalFill"></span>
+            </div>
+          </div>
+
+          <div class="queue-strip" aria-label="后续幸存者队列">
+            <span class="queue-label">QUEUE</span>
+            <div class="queue-tokens" id="queueTokens"></div>
+          </div>
+        </div>
+
+        <div class="gate-grid" id="gateGrid">
+          <button class="gate" type="button" data-lane="0" aria-label="选择左轨道，避难门 1">
+            <span class="gate-topline">
+              <span class="gate-code">GATE 01</span>
+              <span class="gate-key">1</span>
+            </span>
+            <span class="door-shell">
+              <span class="door-frame">
+                <span class="door-status">SEALED</span>
+                <span class="door-symbol shape-circle" aria-hidden="true"></span>
+                <span class="door-name">避难门 A</span>
+                <span class="door-combo">CIRCLE / AMBER</span>
+                <span class="door-seam" aria-hidden="true"></span>
+              </span>
+            </span>
+            <span class="gate-foot">
+              <span>LEFT LANE</span>
+              <span class="gate-arrow" aria-hidden="true">01</span>
+            </span>
+          </button>
+
+          <button class="gate" type="button" data-lane="1" aria-label="选择中轨道，避难门 2">
+            <span class="gate-topline">
+              <span class="gate-code">GATE 02</span>
+              <span class="gate-key">2</span>
+            </span>
+            <span class="door-shell">
+              <span class="door-frame">
+                <span class="door-status">SEALED</span>
+                <span class="door-symbol shape-square" aria-hidden="true"></span>
+                <span class="door-name">避难门 B</span>
+                <span class="door-combo">SQUARE / TEAL</span>
+                <span class="door-seam" aria-hidden="true"></span>
+              </span>
+            </span>
+            <span class="gate-foot">
+              <span>CENTER LANE</span>
+              <span class="gate-arrow" aria-hidden="true">02</span>
+            </span>
+          </button>
+
+          <button class="gate" type="button" data-lane="2" aria-label="选择右轨道，避难门 3">
+            <span class="gate-topline">
+              <span class="gate-code">GATE 03</span>
+              <span class="gate-key">3</span>
+            </span>
+            <span class="door-shell">
+              <span class="door-frame">
+                <span class="door-status">SEALED</span>
+                <span class="door-symbol shape-triangle" aria-hidden="true"></span>
+                <span class="door-name">避难门 C</span>
+                <span class="door-combo">TRIANGLE / BONE</span>
+                <span class="door-seam" aria-hidden="true"></span>
+              </span>
+            </span>
+            <span class="gate-foot">
+              <span>RIGHT LANE</span>
+              <span class="gate-arrow" aria-hidden="true">03</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="mapping-banner" id="mappingBanner" role="status">
+          <span class="warning-mark" aria-hidden="true"></span>
+          <strong>MAPPING SHIFT</strong>
+          <span>门牌映射即将更换</span>
+        </div>
+
+        <div class="feedback-banner" id="feedbackBanner" aria-live="polite"></div>
+      </section>
+
+      <footer class="command-bar">
+        <div class="command-primary">
+          <span class="command-label">CHOOSE LANE</span>
+          <div class="key-group" aria-hidden="true"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></div>
+          <span class="command-note">点击门体或按数字键分流</span>
+        </div>
+        <div class="command-secondary">
+          <span><kbd>SPACE</kbd> 暂停</span>
+          <span><kbd>R</kbd> 重开</span>
+          <span id="queueValue">剩余信号 25</span>
+        </div>
+      </footer>
+    </main>
+
+    <section class="screen screen-start" id="startScreen" aria-labelledby="startTitle">
+      <div class="screen-panel">
+        <span class="screen-index">EVAC / 09</span>
+        <p class="screen-kicker">THE LAST GATE IS CLOSING</p>
+        <h2 id="startTitle">末日车门</h2>
+        <p class="screen-lead">在 30 秒封锁结束前，读取每名幸存者的颜色与形状，把他们送向正确的避难门。</p>
+
+        <div class="start-rules" aria-label="游戏目标">
+          <div><strong>20</strong><span>送对以撤离</span></div>
+          <div><strong>03</strong><span>失误即失去完整度</span></div>
+          <div><strong>30</strong><span>秒内完成分流</span></div>
+        </div>
+
+        <p class="start-warning"><span aria-hidden="true"></span>门牌映射会在连击与阶段变化时重新排列。</p>
+        <button class="primary-button" id="startButton" type="button">
+          <span>开始分流</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+        </button>
+        <p class="screen-footnote">点击轨道操作，也支持数字键 1 / 2 / 3</p>
+      </div>
+    </section>
+
+    <section class="screen screen-pause" id="pauseScreen" aria-labelledby="pauseTitle" hidden>
+      <div class="screen-panel compact-panel">
+        <span class="screen-index">SYSTEM HOLD</span>
+        <p class="screen-kicker">EVACUATION PAUSED</p>
+        <h2 id="pauseTitle">暂停</h2>
+        <p class="screen-lead">倒计时与幸存者信号均已冻结。</p>
+        <div class="button-row">
+          <button class="primary-button" id="resumeButton" type="button">
+            <span>继续</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"></path></svg>
+          </button>
+          <button class="secondary-button" id="pauseRestartButton" type="button">重新开始</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen screen-result" id="resultScreen" aria-labelledby="resultTitle" hidden>
+      <div class="screen-panel result-panel">
+        <span class="screen-index" id="resultIndex">EVACUATION REPORT</span>
+        <p class="screen-kicker" id="resultKicker">SIGNAL LOST</p>
+        <h2 id="resultTitle">封锁失败</h2>
+        <p class="screen-lead" id="resultReason">生命完整度耗尽。</p>
+
+        <div class="result-stats">
+          <div><span>送对</span><strong id="resultCorrect">0</strong></div>
+          <div><span>得分</span><strong id="resultScore">0</strong></div>
+          <div><span>最高连击</span><strong id="resultCombo">0</strong></div>
+          <div><span>失误</span><strong id="resultMisses">0</strong></div>
+        </div>
+
+        <div class="button-row">
+          <button class="primary-button" id="restartButton" type="button">
+            <span>再次分流</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6"></path><path d="M5.8 16a7 7 0 0 0 11.8 2M18.2 8A7 7 0 0 0 6.4 6"></path></svg>
+          </button>
+          <a class="secondary-button link-button" href="GDD_一页纸.pdf" target="_blank" rel="noopener">查看一页纸 GDD</a>
+        </div>
+        <p class="screen-footnote">按 R 可立即重新开始</p>
+      </div>
+    </section>
+
+    <div class="connection-warning" id="connectionWarning" role="alert" hidden>
+      当前浏览器不支持 Web Audio，游戏仍可继续但不会播放音效。
+    </div>
+  </div>
+</body>
+</html>
