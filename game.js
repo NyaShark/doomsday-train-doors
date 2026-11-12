@@ -18,9 +18,14 @@
     firstSpawnAt: 0.35,
     spawnInterval: 1.2,
     responseWindow: 1.15,
+    perfectWindow: 0.45,
     inputDebounce: 0.15,
     mappingWarning: 0.4,
     glitchDuration: 0.15,
+    perfectBonus: 5,
+    priorityBonus: 15,
+    comboMission: 10,
+    perfectMission: 8,
   });
 
   const COMBOS = Object.freeze([
@@ -75,6 +80,7 @@
     survivorCode: document.getElementById("survivorCode"),
     survivorCombo: document.getElementById("survivorCombo"),
     arrivalClock: document.getElementById("arrivalClock"),
+    arrivalPrecision: document.getElementById("arrivalPrecision"),
     arrivalFill: document.getElementById("arrivalFill"),
     queueTokens: document.getElementById("queueTokens"),
     queueValue: document.getElementById("queueValue"),
@@ -83,9 +89,26 @@
     feedbackBanner: document.getElementById("feedbackBanner"),
     systemStateText: document.getElementById("systemStateText"),
     startScreen: document.getElementById("startScreen"),
+    tutorialScreen: document.getElementById("tutorialScreen"),
     pauseScreen: document.getElementById("pauseScreen"),
     resultScreen: document.getElementById("resultScreen"),
     startButton: document.getElementById("startButton"),
+    directStartButton: document.getElementById("directStartButton"),
+    tutorialStepLabel: document.getElementById("tutorialStepLabel"),
+    tutorialTitle: document.getElementById("tutorialTitle"),
+    tutorialDescription: document.getElementById("tutorialDescription"),
+    tutorialTip: document.getElementById("tutorialTip"),
+    tutorialNextButton: document.getElementById("tutorialNextButton"),
+    tutorialRestartButton: document.getElementById("tutorialRestartButton"),
+    tutorialSkipButton: document.getElementById("tutorialSkipButton"),
+    tutorialProgress: [...document.querySelectorAll("[data-tutorial-progress]")],
+    tutorialTargetBadge: document.getElementById("tutorialTargetBadge"),
+    tutorialTargetName: document.getElementById("tutorialTargetName"),
+    tutorialTargetCode: document.getElementById("tutorialTargetCode"),
+    tutorialTargetHint: document.getElementById("tutorialTargetHint"),
+    tutorialGateGrid: document.getElementById("tutorialGateGrid"),
+    tutorialGates: [...document.querySelectorAll(".demo-gate")],
+    tutorialDemoStatus: document.getElementById("tutorialDemoStatus"),
     pauseButton: document.getElementById("pauseButton"),
     soundButton: document.getElementById("soundButton"),
     resumeButton: document.getElementById("resumeButton"),
@@ -98,7 +121,11 @@
     resultCorrect: document.getElementById("resultCorrect"),
     resultScore: document.getElementById("resultScore"),
     resultCombo: document.getElementById("resultCombo"),
+    resultPerfect: document.getElementById("resultPerfect"),
     resultMisses: document.getElementById("resultMisses"),
+    resultRank: document.getElementById("resultRank"),
+    resultRatingText: document.getElementById("resultRatingText"),
+    resultStars: document.getElementById("resultStars"),
     connectionWarning: document.getElementById("connectionWarning"),
   };
 
@@ -164,6 +191,16 @@
       this.tone(165, 0.045, { type: "triangle", gain: 0.04, endFrequency: 120 });
     }
 
+    prioritySpawn() {
+      this.tone(260, 0.08, { type: "triangle", gain: 0.08, endFrequency: 340 });
+      this.tone(390, 0.08, {
+        type: "triangle",
+        gain: 0.055,
+        delay: 0.07,
+        endFrequency: 510,
+      });
+    }
+
     hit(combo) {
       const base = 330 + Math.min(combo, 10) * 14;
       this.tone(base, 0.075, { type: "sine", gain: 0.12, endFrequency: base * 1.22 });
@@ -223,6 +260,13 @@
   let feedbackTimer = null;
   let feedbackToken = 0;
   let state = null;
+  const tutorial = {
+    step: 0,
+    waiting: false,
+    complete: false,
+    mappingRotation: 0,
+    targetComboId: COMBOS[2].id,
+  };
 
   function makeQueue() {
     const queue = [];
@@ -254,6 +298,10 @@
       }
     }
 
+    queue.forEach((survivor, index) => {
+      survivor.priority = (index + 1) % 6 === 0;
+    });
+
     return queue;
   }
 
@@ -268,6 +316,10 @@
       combo: 0,
       maxCombo: 0,
       misses: 0,
+      perfect: 0,
+      perfectStreak: 0,
+      maxPerfectStreak: 0,
+      prioritySaves: 0,
       stage: 1,
       spawned: 0,
       nextSpawnAt: CONFIG.firstSpawnAt,
@@ -290,12 +342,16 @@
     };
   }
 
-  function mappingIds() {
-    if (!state) return COMBOS.map((combo) => combo.id);
-    const rotation = state.mappingRotation % COMBOS.length;
+  function mappingIdsForRotation(value) {
+    const rotation = value % COMBOS.length;
     const ids = COMBOS.map((combo) => combo.id);
     if (rotation === 0) return ids;
     return ids.slice(-rotation).concat(ids.slice(0, ids.length - rotation));
+  }
+
+  function mappingIds() {
+    if (!state) return COMBOS.map((combo) => combo.id);
+    return mappingIdsForRotation(state.mappingRotation);
   }
 
   function comboById(comboId) {
@@ -314,6 +370,12 @@
     if (correct >= 16) return 3;
     if (correct >= 9) return 2;
     return 1;
+  }
+
+  function responseWindowForStage(stage = state?.stage ?? 1) {
+    if (stage >= 3) return 1;
+    if (stage === 2) return 1.08;
+    return CONFIG.responseWindow;
   }
 
   function setBodyState() {
@@ -362,9 +424,9 @@
     dom.queueTokens.replaceChildren(
       ...upcoming.map((survivor) => {
         const token = document.createElement("span");
-        token.className = `queue-token shape-${survivor.combo.shape}`;
+        token.className = `queue-token shape-${survivor.combo.shape}${survivor.priority ? " is-priority" : ""}`;
         token.style.color = `var(--${survivor.combo.color})`;
-        token.title = `${survivor.combo.colorName}${survivor.combo.shapeName}`;
+        token.title = `${survivor.combo.colorName}${survivor.combo.shapeName}${survivor.priority ? "，优先目标" : ""}`;
         return token;
       })
     );
@@ -375,6 +437,7 @@
   function updateSurvivor() {
     if (!state.current) {
       dom.arrivalPanel.classList.add("is-idle");
+      dom.arrivalPanel.classList.remove("is-priority", "is-perfect-window");
       dom.arrivalKicker.textContent = state.status === "playing" ? "SIGNAL WINDOW" : "NEXT SURVIVOR";
       dom.arrivalTitle.textContent =
         state.status === "playing" ? "等待下一名幸存者" : "等待救援信号";
@@ -384,6 +447,7 @@
       dom.survivorCode.textContent = "NO SIGNAL";
       dom.survivorCombo.textContent = "待命";
       dom.arrivalClock.textContent = "--";
+      dom.arrivalPrecision.textContent = "SAFE WINDOW";
       dom.arrivalFill.style.transform = "scaleX(1)";
       dom.arrivalFill.style.backgroundColor = "";
       return;
@@ -398,18 +462,29 @@
       0,
       Math.min(1, windowLeft / CONFIG.responseWindow)
     );
+    const elapsedSinceSpawn = state.elapsed - state.current.spawnedAt;
+    const inPerfectWindow = elapsedSinceSpawn <= CONFIG.perfectWindow;
     dom.arrivalPanel.classList.remove("is-idle");
-    dom.arrivalKicker.textContent = "INCOMING SURVIVOR";
-    dom.arrivalTitle.textContent = "匹配目标标记";
-    dom.arrivalHint.textContent = "颜色与形状必须同时匹配";
+    dom.arrivalPanel.classList.toggle("is-priority", Boolean(state.current.priority));
+    dom.arrivalPanel.classList.toggle("is-perfect-window", inPerfectWindow);
+    dom.arrivalKicker.textContent = state.current.priority ? "PRIORITY SURVIVOR" : "INCOMING SURVIVOR";
+    dom.arrivalTitle.textContent = state.current.priority ? "优先撤离目标" : "匹配目标标记";
+    dom.arrivalHint.textContent = state.current.priority
+      ? "正确分流可获得额外分数"
+      : "颜色与形状必须同时匹配";
     dom.survivorBadge.className = `survivor-badge shape-${combo.shape}`;
     dom.survivorBadge.style.color = `var(--${combo.color})`;
     dom.survivorCode.textContent = `S-${String(state.current.instanceId).padStart(3, "0")} / ${combo.code}`;
-    dom.survivorCombo.textContent = `${combo.colorName} · ${combo.shapeName}`;
+    dom.survivorCombo.textContent = `${combo.colorName} · ${combo.shapeName}${state.current.priority ? " · PRIORITY" : ""}`;
     dom.arrivalClock.textContent = windowLeft.toFixed(2);
-    dom.arrivalFill.style.transform = `scaleX(${progress})`;
+    dom.arrivalPrecision.textContent = inPerfectWindow ? "PERFECT WINDOW" : "SAFE WINDOW";
+    dom.arrivalFill.style.transform = `scaleX(${Math.max(0, Math.min(1, windowLeft / state.current.responseWindow))})`;
     dom.arrivalFill.style.backgroundColor =
-      windowLeft < 0.35 ? "var(--danger)" : "var(--amber)";
+      windowLeft < 0.25
+        ? "var(--danger)"
+        : inPerfectWindow
+          ? "var(--amber)"
+          : "var(--teal)";
   }
 
   function updateHud() {
@@ -433,6 +508,8 @@
         ? "分流进行中"
         : state.status === "paused"
           ? "系统暂停"
+          : state.status === "tutorial"
+            ? "训练模式"
           : state.status === "success"
             ? "撤离完成"
             : state.status === "failure"
@@ -554,16 +631,22 @@
 
     const survivor = state.queue.shift();
     const now = state.elapsed;
+    const responseWindow = responseWindowForStage();
     state.spawned += 1;
     state.nextSpawnAt =
       CONFIG.firstSpawnAt + state.spawned * CONFIG.spawnInterval;
     state.current = {
       ...survivor,
       spawnedAt: now,
-      deadline: now + CONFIG.responseWindow,
+      responseWindow,
+      deadline: now + responseWindow,
       answered: false,
     };
-    audio.tick();
+    if (survivor.priority) {
+      audio.prioritySpawn();
+    } else {
+      audio.tick();
+    }
     updateAll();
   }
 
@@ -571,6 +654,9 @@
     if (!state.current || state.current.answered) return;
     const survivor = state.current;
     const targetLane = laneForCombo(survivor.combo.id);
+    const responseTime = Math.max(0, state.elapsed - survivor.spawnedAt);
+    const isPerfect = isCorrect && responseTime <= CONFIG.perfectWindow;
+    const isPriority = Boolean(survivor.priority);
     survivor.answered = true;
     state.current = null;
 
@@ -579,14 +665,33 @@
       state.combo += 1;
       state.maxCombo = Math.max(state.maxCombo, state.combo);
       const multiplier = currentMultiplier();
-      state.score += Math.round(10 * multiplier);
+      const baseScore = Math.round(10 * multiplier);
+      const perfectBonus = isPerfect ? CONFIG.perfectBonus : 0;
+      const priorityBonus = isPriority ? CONFIG.priorityBonus : 0;
+      state.score += baseScore + perfectBonus + priorityBonus;
+      if (isPerfect) {
+        state.perfect += 1;
+        state.perfectStreak += 1;
+        state.maxPerfectStreak = Math.max(
+          state.maxPerfectStreak,
+          state.perfectStreak
+        );
+      } else {
+        state.perfectStreak = 0;
+      }
+      if (isPriority) {
+        state.prioritySaves += 1;
+      }
       audio.hit(state.combo);
       showGateResult(chosenLane, "correct");
       animateArrivalPanel("correct");
+      const bonusLabels = [];
+      if (isPerfect) bonusLabels.push(`精准 +${perfectBonus}`);
+      if (isPriority) bonusLabels.push(`优先 +${priorityBonus}`);
       showFeedback(
-        `分流成功  +${Math.round(10 * multiplier)}  /  ${multiplier.toFixed(1)}×`,
+        `分流成功  +${baseScore + perfectBonus + priorityBonus}${bonusLabels.length ? `  /  ${bonusLabels.join(" · ")}` : ""}`,
         "good",
-        620
+        720
       );
 
       const newStage = currentStage();
@@ -615,6 +720,7 @@
       state.lives -= 1;
       state.misses += 1;
       state.combo = 0;
+      state.perfectStreak = 0;
       state.lastResultReason = reason;
       audio.miss();
       animateArrivalPanel("miss");
@@ -739,6 +845,7 @@
 
   function showOnlyScreen(screenName) {
     dom.startScreen.hidden = screenName !== "start";
+    dom.tutorialScreen.hidden = screenName !== "tutorial";
     dom.pauseScreen.hidden = screenName !== "pause";
     dom.resultScreen.hidden = screenName !== "result";
   }
@@ -751,6 +858,154 @@
     dom.arrivalPanel.className = "arrival-panel is-idle";
     showOnlyScreen("start");
     updateAll();
+  }
+
+  function setTutorialStatus(text, type = "neutral") {
+    dom.tutorialDemoStatus.className = `demo-status ${type === "neutral" ? "" : `is-${type}`}`.trim();
+    dom.tutorialDemoStatus.querySelector("strong").textContent = text;
+  }
+
+  function renderTutorialDoors(rotation) {
+    const ids = mappingIdsForRotation(rotation);
+    dom.tutorialGates.forEach((gate, index) => {
+      const combo = comboById(ids[index]);
+      gate.dataset.color = combo.color;
+      gate.dataset.combo = combo.id;
+      gate.classList.remove("is-correct", "is-wrong");
+      gate.querySelector(".demo-symbol").className = `demo-symbol shape-${combo.shape}`;
+      gate.querySelector(".demo-gate-name").textContent = `${combo.colorName}${combo.shapeName}门`;
+      gate.querySelector(".demo-gate-code-label").textContent = combo.code;
+    });
+  }
+
+  function renderTutorialTarget(combo) {
+    dom.tutorialTargetBadge.className = `demo-badge shape-${combo.shape}`;
+    dom.tutorialTargetBadge.style.color = `var(--${combo.color})`;
+    dom.tutorialTargetName.textContent = `${combo.colorName} · ${combo.shapeName}`;
+    dom.tutorialTargetCode.textContent = combo.code;
+  }
+
+  function renderTutorialStep() {
+    const target = comboById(tutorial.targetComboId);
+    renderTutorialTarget(target);
+    renderTutorialDoors(tutorial.mappingRotation);
+    dom.tutorialProgress.forEach((marker, index) => {
+      marker.classList.toggle("is-active", index <= tutorial.step);
+    });
+    dom.tutorialRestartButton.hidden = true;
+
+    if (tutorial.step === 0) {
+      tutorial.waiting = false;
+      dom.tutorialStepLabel.textContent = "01 / 识别信号";
+      dom.tutorialTitle.textContent = "颜色与形状必须同时匹配";
+      dom.tutorialDescription.textContent =
+        "幸存者身上的标记决定去向。先看颜色，再确认形状；两项同时匹配，才是正确避难门。";
+      dom.tutorialTip.textContent =
+        "提示：颜色、形状和英文缩写会同时出现在门牌上。";
+      dom.tutorialNextButton.hidden = false;
+      dom.tutorialNextButton.querySelector("span").textContent = "下一步";
+      dom.tutorialTargetHint.textContent = "找到颜色与形状完全相同的门牌";
+      setTutorialStatus("观察目标标记，然后继续", "neutral");
+      return;
+    }
+
+    if (tutorial.step === 1) {
+      tutorial.waiting = true;
+      dom.tutorialStepLabel.textContent = "02 / 选择避难门";
+      dom.tutorialTitle.textContent = "按标记选择对应门牌";
+      dom.tutorialDescription.textContent =
+        "现在由你完成一次分流。点击与幸存者颜色、形状同时匹配的避难门。";
+      dom.tutorialTip.textContent =
+        "点击门体即可选择，实战中也可以使用数字键 1 / 2 / 3。";
+      dom.tutorialNextButton.hidden = true;
+      dom.tutorialTargetHint.textContent = "请选择正确门牌";
+      setTutorialStatus("等待你的选择", "warning");
+      return;
+    }
+
+    if (!tutorial.complete) {
+      tutorial.waiting = true;
+      dom.tutorialStepLabel.textContent = "03 / 重新读取";
+      dom.tutorialTitle.textContent = "门牌映射已经重排";
+      dom.tutorialDescription.textContent =
+        "同一名幸存者的目标没有改变，但门牌位置已经变化。不要依赖上一轮的位置，要重新读取当前映射。";
+      dom.tutorialTip.textContent =
+        "实战中映射变化前会有 0.4 秒警示，变化后必须重新判断。";
+      dom.tutorialNextButton.hidden = true;
+      dom.tutorialTargetHint.textContent = "重新选择正确门牌";
+      setTutorialStatus("门牌映射已重排，请重新判断", "bad");
+      return;
+    }
+
+    tutorial.waiting = false;
+    dom.tutorialStepLabel.textContent = "训练完成 / READY";
+    dom.tutorialTitle.textContent = "你已经可以进入封锁区";
+    dom.tutorialDescription.textContent =
+      "实战会加入倒计时、精准响应、优先幸存者和更快节奏。连续判断当前画面，不要记住固定位置。";
+    dom.tutorialTip.textContent =
+      "精准分流：出现幸存者后 0.45 秒内送对，可获得额外分数。";
+    dom.tutorialNextButton.hidden = false;
+    dom.tutorialNextButton.querySelector("span").textContent = "开始实战";
+    dom.tutorialTargetHint.textContent = "训练完成";
+    setTutorialStatus("训练通过，准备进入封锁区", "good");
+  }
+
+  function startTutorial() {
+    audio.init();
+    state = createInitialState();
+    state.status = "tutorial";
+    tutorial.step = 0;
+    tutorial.waiting = false;
+    tutorial.complete = false;
+    tutorial.mappingRotation = 0;
+    tutorial.targetComboId = COMBOS[0].id;
+    showOnlyScreen("tutorial");
+    renderTutorialStep();
+    updateAll();
+  }
+
+  function chooseTutorialLane(lane) {
+    if (!tutorial.waiting) return;
+    const targetLane = mappingIdsForRotation(tutorial.mappingRotation).indexOf(
+      tutorial.targetComboId
+    );
+    const gate = dom.tutorialGates[lane];
+    dom.tutorialGates.forEach((item) =>
+      item.classList.remove("is-correct", "is-wrong")
+    );
+    if (lane !== targetLane) {
+      gate.classList.add("is-wrong");
+      tutorial.waiting = false;
+      dom.tutorialRestartButton.hidden = false;
+      setTutorialStatus("标记不匹配：请同时检查颜色和形状", "bad");
+      return;
+    }
+
+    gate.classList.add("is-correct");
+    tutorial.waiting = false;
+    setTutorialStatus("分流正确", "good");
+    window.setTimeout(() => {
+      if (tutorial.step === 1) {
+        tutorial.step = 2;
+        tutorial.mappingRotation = 1;
+        renderTutorialStep();
+      } else if (tutorial.step === 2) {
+        tutorial.complete = true;
+        renderTutorialStep();
+      }
+    }, 360);
+  }
+
+  function advanceTutorial() {
+    if (tutorial.complete) {
+      startGame();
+      return;
+    }
+    if (tutorial.waiting) return;
+    if (tutorial.step === 0) {
+      tutorial.step = 1;
+      renderTutorialStep();
+    }
   }
 
   function startGame() {
@@ -802,7 +1057,38 @@
     dom.resultCorrect.textContent = `${state.correct} / 20`;
     dom.resultScore.textContent = String(state.score).padStart(4, "0");
     dom.resultCombo.textContent = String(state.maxCombo);
+    dom.resultPerfect.textContent = String(state.perfect);
     dom.resultMisses.textContent = String(state.misses);
+    const objectives = [
+      state.correct >= CONFIG.targetCorrect,
+      state.maxCombo >= CONFIG.comboMission,
+      state.perfect >= CONFIG.perfectMission,
+    ];
+    const earnedStars = objectives.filter(Boolean).length;
+    const rank = isSuccess
+      ? state.perfect >= 12 && state.maxCombo >= 15
+        ? "S"
+        : state.perfect >= 8 && state.maxCombo >= 10
+          ? "A"
+          : "B"
+      : state.correct >= 10
+        ? "D"
+        : "F";
+    dom.resultRank.textContent = rank;
+    dom.resultRank.dataset.rank = rank;
+    dom.resultRatingText.textContent = isSuccess
+      ? earnedStars === 3
+        ? "全部单局挑战完成"
+        : `${earnedStars} / 3 项挑战完成`
+      : "本次封锁未完成";
+    dom.resultStars.replaceChildren(
+      ...objectives.map((earned) => {
+        const star = document.createElement("span");
+        star.classList.toggle("is-earned", earned);
+        return star;
+      })
+    );
+    dom.resultStars.setAttribute("aria-label", `${earnedStars} / 3 项挑战完成`);
     showOnlyScreen("result");
     updateAll();
     if (isSuccess) {
@@ -832,7 +1118,9 @@
 
     if (["1", "2", "3"].includes(event.key)) {
       event.preventDefault();
-      if (state.status === "playing") {
+      if (state.status === "tutorial") {
+        chooseTutorialLane(Number(event.key) - 1);
+      } else if (state.status === "playing") {
         chooseLane(Number(event.key) - 1);
       }
       return;
@@ -843,7 +1131,9 @@
       if (state.status === "playing" || state.status === "paused") {
         pauseGame();
       } else if (state.status === "ready") {
-        startGame();
+        startTutorial();
+      } else if (state.status === "tutorial") {
+        advanceTutorial();
       } else if (state.status === "success" || state.status === "failure") {
         startGame();
       }
@@ -864,7 +1154,18 @@
         chooseLane(Number(gate.dataset.lane));
       });
     });
-    dom.startButton.addEventListener("click", startGame);
+    dom.startButton.addEventListener("click", startTutorial);
+    dom.directStartButton.addEventListener("click", startGame);
+    dom.tutorialNextButton.addEventListener("click", advanceTutorial);
+    dom.tutorialSkipButton.addEventListener("click", startGame);
+    dom.tutorialRestartButton.addEventListener("click", () => {
+      renderTutorialStep();
+    });
+    dom.tutorialGates.forEach((gate) => {
+      gate.addEventListener("click", () => {
+        chooseTutorialLane(Number(gate.dataset.demoLane));
+      });
+    });
     dom.restartButton.addEventListener("click", startGame);
     dom.pauseRestartButton.addEventListener("click", startGame);
     dom.pauseButton.addEventListener("click", pauseGame);
@@ -894,6 +1195,9 @@
           combo: state.combo,
           maxCombo: state.maxCombo,
           misses: state.misses,
+          perfect: state.perfect,
+          maxPerfectStreak: state.maxPerfectStreak,
+          prioritySaves: state.prioritySaves,
           stage: state.stage,
           spawned: state.spawned,
           mappingIds: mappingIds(),

@@ -120,6 +120,7 @@
 
           <div class="arrival-clock">
             <span id="arrivalClock">--</span>
+            <small id="arrivalPrecision">SAFE WINDOW</small>
             <div class="arrival-track" aria-hidden="true">
               <span id="arrivalFill"></span>
             </div>
@@ -230,11 +231,95 @@
         </div>
 
         <p class="start-warning"><span aria-hidden="true"></span>门牌映射会在连击与阶段变化时重新排列。</p>
-        <button class="primary-button" id="startButton" type="button">
-          <span>开始分流</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
-        </button>
+        <div class="start-missions" aria-label="单局挑战目标">
+          <span>撤离 20 名</span>
+          <span>达成 10 连击</span>
+          <span>完成 8 次精准分流</span>
+        </div>
+        <div class="start-actions">
+          <button class="primary-button" id="startButton" type="button">
+            <span>开始新手训练</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+          </button>
+          <button class="secondary-button" id="directStartButton" type="button">直接开始</button>
+        </div>
         <p class="screen-footnote">点击轨道操作，也支持数字键 1 / 2 / 3</p>
+      </div>
+    </section>
+
+    <section class="screen screen-tutorial" id="tutorialScreen" aria-labelledby="tutorialTitle" hidden>
+      <div class="screen-panel tutorial-panel">
+        <div class="tutorial-heading">
+          <div>
+            <span class="screen-index">EVACUATION TRAINING / 03 STEPS</span>
+            <p class="screen-kicker">READ THE SIGNAL BEFORE THE DOOR CLOSES</p>
+            <h2>分流训练</h2>
+          </div>
+          <button class="text-button" id="tutorialSkipButton" type="button">跳过训练</button>
+        </div>
+
+        <div class="tutorial-progress" aria-label="训练进度">
+          <span class="is-active" data-tutorial-progress="0"></span>
+          <span data-tutorial-progress="1"></span>
+          <span data-tutorial-progress="2"></span>
+        </div>
+
+        <div class="tutorial-layout">
+          <div class="tutorial-copy">
+            <span class="tutorial-step" id="tutorialStepLabel">01 / 识别信号</span>
+            <h3 id="tutorialTitle">颜色与形状必须同时匹配</h3>
+            <p id="tutorialDescription">幸存者身上的标记决定去向。先看颜色，再确认形状；两项同时匹配，才是正确避难门。</p>
+            <p class="tutorial-tip" id="tutorialTip">提示：颜色、形状和英文缩写会同时出现在门牌上。</p>
+            <div class="tutorial-actions">
+              <button class="primary-button" id="tutorialNextButton" type="button">
+                <span>我明白了</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+              </button>
+              <button class="secondary-button" id="tutorialRestartButton" type="button" hidden>重试本例</button>
+            </div>
+          </div>
+
+          <div class="tutorial-demo" id="tutorialDemo">
+            <div class="demo-target">
+              <span class="eyebrow">TARGET SIGNAL</span>
+              <div class="demo-survivor">
+                <span class="demo-figure" aria-hidden="true"><i></i><b></b></span>
+                <span class="demo-badge" id="tutorialTargetBadge" aria-hidden="true"></span>
+                <span>
+                  <strong id="tutorialTargetName">骨白 · 三角</strong>
+                  <small id="tutorialTargetCode">TRIANGLE // BONE</small>
+                </span>
+              </div>
+              <p id="tutorialTargetHint">找到颜色与形状完全相同的门牌</p>
+            </div>
+
+            <div class="demo-gates" id="tutorialGateGrid">
+              <button class="demo-gate" type="button" data-demo-lane="0" aria-label="训练：选择左门">
+                <span class="demo-gate-code">01</span>
+                <span class="demo-symbol shape-circle"></span>
+                <span class="demo-gate-name">琥珀圆门</span>
+                <span class="demo-gate-code-label">CIRCLE // AMBER</span>
+              </button>
+              <button class="demo-gate" type="button" data-demo-lane="1" aria-label="训练：选择中门">
+                <span class="demo-gate-code">02</span>
+                <span class="demo-symbol shape-square"></span>
+                <span class="demo-gate-name">冷青方门</span>
+                <span class="demo-gate-code-label">SQUARE // TEAL</span>
+              </button>
+              <button class="demo-gate" type="button" data-demo-lane="2" aria-label="训练：选择右门">
+                <span class="demo-gate-code">03</span>
+                <span class="demo-symbol shape-triangle"></span>
+                <span class="demo-gate-name">骨白角门</span>
+                <span class="demo-gate-code-label">TRIANGLE // BONE</span>
+              </button>
+            </div>
+
+            <div class="demo-status" id="tutorialDemoStatus">
+              <span aria-hidden="true"></span>
+              <strong>等待下一步</strong>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -265,7 +350,17 @@
           <div><span>送对</span><strong id="resultCorrect">0</strong></div>
           <div><span>得分</span><strong id="resultScore">0</strong></div>
           <div><span>最高连击</span><strong id="resultCombo">0</strong></div>
+          <div><span>精准分流</span><strong id="resultPerfect">0</strong></div>
           <div><span>失误</span><strong id="resultMisses">0</strong></div>
+        </div>
+
+        <div class="result-rating">
+          <div class="rank-mark" id="resultRank">B</div>
+          <div>
+            <span class="eyebrow">MISSION RATING</span>
+            <strong id="resultRatingText">任务完成</strong>
+            <div class="star-row" id="resultStars" aria-label="任务星级"></div>
+          </div>
         </div>
 
         <div class="button-row">
