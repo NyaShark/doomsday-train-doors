@@ -61,6 +61,33 @@
     3: { label: "STAGE 03 / TERMINAL", name: "终局闸门" },
   });
 
+  const PROTOCOLS = Object.freeze({
+    direct: Object.freeze({
+      id: "direct",
+      label: "常规分流",
+      code: "DIRECT",
+      hint: "选择完全相同的颜色与形状",
+      offset: 0,
+      className: "",
+    }),
+    right: Object.freeze({
+      id: "right",
+      label: "右转指令",
+      code: "TURN RIGHT",
+      hint: "找到精确门后，再向右移动一轨",
+      offset: 1,
+      className: "is-turn",
+    }),
+    left: Object.freeze({
+      id: "left",
+      label: "逆向指令",
+      code: "TURN LEFT",
+      hint: "找到精确门后，再向左移动一轨",
+      offset: 2,
+      className: "is-reverse",
+    }),
+  });
+
   const dom = {
     world: document.getElementById("world"),
     timer: document.getElementById("timerValue"),
@@ -79,6 +106,7 @@
     survivorBadge: document.getElementById("survivorBadge"),
     survivorCode: document.getElementById("survivorCode"),
     survivorCombo: document.getElementById("survivorCombo"),
+    survivorProtocol: document.getElementById("survivorProtocol"),
     arrivalClock: document.getElementById("arrivalClock"),
     arrivalPrecision: document.getElementById("arrivalPrecision"),
     arrivalFill: document.getElementById("arrivalFill"),
@@ -106,6 +134,8 @@
     tutorialTargetName: document.getElementById("tutorialTargetName"),
     tutorialTargetCode: document.getElementById("tutorialTargetCode"),
     tutorialTargetHint: document.getElementById("tutorialTargetHint"),
+    tutorialTargetProtocol: document.getElementById("tutorialTargetProtocol"),
+    tutorialProtocolDescription: document.getElementById("tutorialProtocolDescription"),
     tutorialGateGrid: document.getElementById("tutorialGateGrid"),
     tutorialGates: [...document.querySelectorAll(".demo-gate")],
     tutorialDemoStatus: document.getElementById("tutorialDemoStatus"),
@@ -266,6 +296,7 @@
     complete: false,
     mappingRotation: 0,
     targetComboId: COMBOS[2].id,
+    protocolId: "direct",
   };
 
   function makeQueue() {
@@ -358,8 +389,28 @@
     return COMBOS.find((combo) => combo.id === comboId);
   }
 
-  function laneForCombo(comboId) {
-    return mappingIds().indexOf(comboId);
+  function protocolForSpawn(stage, spawned) {
+    if (stage <= 1) return PROTOCOLS.direct;
+    if (stage === 2) {
+      return spawned % 3 === 0 ? PROTOCOLS.right : PROTOCOLS.direct;
+    }
+    const pattern = spawned % 3;
+    if (pattern === 0) return PROTOCOLS.right;
+    if (pattern === 1) return PROTOCOLS.left;
+    return PROTOCOLS.direct;
+  }
+
+  function targetLaneForCombo(comboId, protocol, mapping = mappingIds()) {
+    const exactLane = mapping.indexOf(comboId);
+    return (exactLane + protocol.offset) % COMBOS.length;
+  }
+
+  function targetLaneForSurvivor(survivor) {
+    return targetLaneForCombo(
+      survivor.combo.id,
+      survivor.protocol,
+      mappingIds()
+    );
   }
 
   function currentMultiplier(combo = state?.combo ?? 0) {
@@ -437,7 +488,13 @@
   function updateSurvivor() {
     if (!state.current) {
       dom.arrivalPanel.classList.add("is-idle");
-      dom.arrivalPanel.classList.remove("is-priority", "is-perfect-window");
+      dom.arrivalPanel.classList.remove(
+        "is-priority",
+        "is-perfect-window",
+        "is-turn",
+        "is-reverse"
+      );
+      dom.arrivalPanel.dataset.protocol = "";
       dom.arrivalKicker.textContent = state.status === "playing" ? "SIGNAL WINDOW" : "NEXT SURVIVOR";
       dom.arrivalTitle.textContent =
         state.status === "playing" ? "等待下一名幸存者" : "等待救援信号";
@@ -446,6 +503,8 @@
       dom.survivorBadge.style.color = "";
       dom.survivorCode.textContent = "NO SIGNAL";
       dom.survivorCombo.textContent = "待命";
+      dom.survivorProtocol.className = "protocol-chip";
+      dom.survivorProtocol.textContent = "常规分流";
       dom.arrivalClock.textContent = "--";
       dom.arrivalPrecision.textContent = "SAFE WINDOW";
       dom.arrivalFill.style.transform = "scaleX(1)";
@@ -454,6 +513,7 @@
     }
 
     const combo = state.current.combo;
+    const protocol = state.current.protocol;
     const windowLeft = Math.max(
       0,
       state.current.deadline - state.elapsed
@@ -467,15 +527,22 @@
     dom.arrivalPanel.classList.remove("is-idle");
     dom.arrivalPanel.classList.toggle("is-priority", Boolean(state.current.priority));
     dom.arrivalPanel.classList.toggle("is-perfect-window", inPerfectWindow);
-    dom.arrivalKicker.textContent = state.current.priority ? "PRIORITY SURVIVOR" : "INCOMING SURVIVOR";
-    dom.arrivalTitle.textContent = state.current.priority ? "优先撤离目标" : "匹配目标标记";
+    dom.arrivalPanel.classList.toggle("is-turn", protocol.id === "right");
+    dom.arrivalPanel.classList.toggle("is-reverse", protocol.id === "left");
+    dom.arrivalPanel.dataset.protocol = protocol.id;
+    dom.arrivalKicker.textContent = `${protocol.code} / ${state.current.priority ? "PRIORITY" : "INCOMING"}`;
+    dom.arrivalTitle.textContent = state.current.priority
+      ? `优先目标 · ${protocol.label}`
+      : protocol.label;
     dom.arrivalHint.textContent = state.current.priority
-      ? "正确分流可获得额外分数"
-      : "颜色与形状必须同时匹配";
+      ? `${protocol.hint}，正确分流有额外奖励`
+      : protocol.hint;
     dom.survivorBadge.className = `survivor-badge shape-${combo.shape}`;
     dom.survivorBadge.style.color = `var(--${combo.color})`;
     dom.survivorCode.textContent = `S-${String(state.current.instanceId).padStart(3, "0")} / ${combo.code}`;
     dom.survivorCombo.textContent = `${combo.colorName} · ${combo.shapeName}${state.current.priority ? " · PRIORITY" : ""}`;
+    dom.survivorProtocol.className = `protocol-chip ${protocol.className}`.trim();
+    dom.survivorProtocol.textContent = `${protocol.label} / ${protocol.code}`;
     dom.arrivalClock.textContent = windowLeft.toFixed(2);
     dom.arrivalPrecision.textContent = inPerfectWindow ? "PERFECT WINDOW" : "SAFE WINDOW";
     dom.arrivalFill.style.transform = `scaleX(${Math.max(0, Math.min(1, windowLeft / state.current.responseWindow))})`;
@@ -633,10 +700,12 @@
     const now = state.elapsed;
     const responseWindow = responseWindowForStage();
     state.spawned += 1;
+    const protocol = protocolForSpawn(state.stage, state.spawned);
     state.nextSpawnAt =
       CONFIG.firstSpawnAt + state.spawned * CONFIG.spawnInterval;
     state.current = {
       ...survivor,
+      protocol,
       spawnedAt: now,
       responseWindow,
       deadline: now + responseWindow,
@@ -653,7 +722,7 @@
   function resolveSurvivor(isCorrect, reason, chosenLane, isMiss = false) {
     if (!state.current || state.current.answered) return;
     const survivor = state.current;
-    const targetLane = laneForCombo(survivor.combo.id);
+    const targetLane = targetLaneForSurvivor(survivor);
     const responseTime = Math.max(0, state.elapsed - survivor.spawnedAt);
     const isPerfect = isCorrect && responseTime <= CONFIG.perfectWindow;
     const isPriority = Boolean(survivor.priority);
@@ -754,7 +823,7 @@
       return false;
     }
 
-    const targetLane = laneForCombo(state.current.combo.id);
+    const targetLane = targetLaneForSurvivor(state.current);
     if (lane === targetLane) {
       resolveSurvivor(true, "", lane);
     } else {
@@ -887,8 +956,11 @@
 
   function renderTutorialStep() {
     const target = comboById(tutorial.targetComboId);
+    const protocol = PROTOCOLS[tutorial.protocolId];
     renderTutorialTarget(target);
     renderTutorialDoors(tutorial.mappingRotation);
+    dom.tutorialTargetProtocol.textContent = protocol.label;
+    dom.tutorialProtocolDescription.textContent = protocol.hint;
     dom.tutorialProgress.forEach((marker, index) => {
       marker.classList.toggle("is-active", index <= tutorial.step);
     });
@@ -896,6 +968,7 @@
 
     if (tutorial.step === 0) {
       tutorial.waiting = false;
+      tutorial.protocolId = "direct";
       dom.tutorialStepLabel.textContent = "01 / 识别信号";
       dom.tutorialTitle.textContent = "颜色与形状必须同时匹配";
       dom.tutorialDescription.textContent =
@@ -911,6 +984,7 @@
 
     if (tutorial.step === 1) {
       tutorial.waiting = true;
+      tutorial.protocolId = "direct";
       dom.tutorialStepLabel.textContent = "02 / 选择避难门";
       dom.tutorialTitle.textContent = "按标记选择对应门牌";
       dom.tutorialDescription.textContent =
@@ -923,8 +997,9 @@
       return;
     }
 
-    if (!tutorial.complete) {
+    if (tutorial.step === 2) {
       tutorial.waiting = true;
+      tutorial.protocolId = "direct";
       dom.tutorialStepLabel.textContent = "03 / 重新读取";
       dom.tutorialTitle.textContent = "门牌映射已经重排";
       dom.tutorialDescription.textContent =
@@ -934,6 +1009,21 @@
       dom.tutorialNextButton.hidden = true;
       dom.tutorialTargetHint.textContent = "重新选择正确门牌";
       setTutorialStatus("门牌映射已重排，请重新判断", "bad");
+      return;
+    }
+
+    if (tutorial.step === 3 && !tutorial.complete) {
+      tutorial.waiting = true;
+      tutorial.protocolId = "right";
+      dom.tutorialStepLabel.textContent = "04 / 转向指令";
+      dom.tutorialTitle.textContent = "先找精确门，再向右移动";
+      dom.tutorialDescription.textContent =
+        "部分幸存者要求转向分流。先根据颜色与形状找到精确门，再按指令移动到相邻轨道。";
+      dom.tutorialTip.textContent =
+        "右转令向右移动一轨，最右侧继续右转会回到最左侧；逆向令则向左移动一轨。";
+      dom.tutorialNextButton.hidden = true;
+      dom.tutorialTargetHint.textContent = "精确门右侧一轨";
+      setTutorialStatus("右转指令：精确门右侧", "warning");
       return;
     }
 
@@ -959,6 +1049,7 @@
     tutorial.complete = false;
     tutorial.mappingRotation = 0;
     tutorial.targetComboId = COMBOS[0].id;
+    tutorial.protocolId = "direct";
     showOnlyScreen("tutorial");
     renderTutorialStep();
     updateAll();
@@ -966,8 +1057,10 @@
 
   function chooseTutorialLane(lane) {
     if (!tutorial.waiting) return;
-    const targetLane = mappingIdsForRotation(tutorial.mappingRotation).indexOf(
-      tutorial.targetComboId
+    const targetLane = targetLaneForCombo(
+      tutorial.targetComboId,
+      PROTOCOLS[tutorial.protocolId],
+      mappingIdsForRotation(tutorial.mappingRotation)
     );
     const gate = dom.tutorialGates[lane];
     dom.tutorialGates.forEach((item) =>
@@ -977,7 +1070,12 @@
       gate.classList.add("is-wrong");
       tutorial.waiting = false;
       dom.tutorialRestartButton.hidden = false;
-      setTutorialStatus("标记不匹配：请同时检查颜色和形状", "bad");
+      setTutorialStatus(
+        tutorial.protocolId === "direct"
+          ? "标记不匹配：请同时检查颜色和形状"
+          : "转向错误：先找精确门，再按指令移动",
+        "bad"
+      );
       return;
     }
 
@@ -988,8 +1086,14 @@
       if (tutorial.step === 1) {
         tutorial.step = 2;
         tutorial.mappingRotation = 1;
+        tutorial.protocolId = "direct";
         renderTutorialStep();
       } else if (tutorial.step === 2) {
+        tutorial.step = 3;
+        tutorial.mappingRotation = 1;
+        tutorial.protocolId = "right";
+        renderTutorialStep();
+      } else if (tutorial.step === 3) {
         tutorial.complete = true;
         renderTutorialStep();
       }
@@ -1210,7 +1314,8 @@
             ? {
                 instanceId: state.current.instanceId,
                 comboId: state.current.combo.id,
-                targetLane: laneForCombo(state.current.combo.id),
+                protocolId: state.current.protocol.id,
+                targetLane: targetLaneForSurvivor(state.current),
                 deadline: state.current.deadline,
               }
             : null,

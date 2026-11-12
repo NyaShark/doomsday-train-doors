@@ -719,6 +719,38 @@ body.is-warning .mapping-state::before {
   white-space: nowrap;
 }
 
+.protocol-chip {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 6px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  font-family: var(--font-cjk);
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.protocol-chip.is-turn {
+  color: #f1c977;
+  border-color: rgba(var(--amber-rgb), 0.55);
+}
+
+.protocol-chip.is-reverse {
+  color: #d8a99f;
+  border-color: rgba(var(--danger-rgb), 0.55);
+}
+
+.arrival-panel.is-turn::before {
+  background: var(--amber);
+}
+
+.arrival-panel.is-reverse::before {
+  background: var(--danger);
+}
+
 .arrival-clock {
   min-width: 0;
   text-align: right;
@@ -1574,7 +1606,7 @@ kbd {
 
 .tutorial-progress {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 5px;
   margin: 20px 0;
 }
@@ -1770,6 +1802,32 @@ kbd {
   color: var(--muted);
   font-family: var(--font-cjk);
   font-size: 9px;
+}
+
+.protocol-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.protocol-rule strong {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  color: var(--amber);
+  border: 1px solid rgba(var(--amber-rgb), 0.5);
+  font-family: var(--font-cjk);
+  font-size: 8px;
+  font-weight: 760;
+}
+
+.protocol-rule span {
+  color: var(--muted);
+  font-family: var(--font-cjk);
+  font-size: 8px;
+  line-height: 1.5;
 }
 
 .demo-gates {

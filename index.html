@@ -115,6 +115,7 @@
             <div class="survivor-data">
               <span class="survivor-code" id="survivorCode">NO SIGNAL</span>
               <strong id="survivorCombo">待命</strong>
+              <span class="protocol-chip" id="survivorProtocol">常规分流</span>
             </div>
           </div>
 
@@ -251,7 +252,7 @@
       <div class="screen-panel tutorial-panel">
         <div class="tutorial-heading">
           <div>
-            <span class="screen-index">EVACUATION TRAINING / 03 STEPS</span>
+            <span class="screen-index">EVACUATION TRAINING / 04 STEPS</span>
             <p class="screen-kicker">READ THE SIGNAL BEFORE THE DOOR CLOSES</p>
             <h2>分流训练</h2>
           </div>
@@ -262,6 +263,7 @@
           <span class="is-active" data-tutorial-progress="0"></span>
           <span data-tutorial-progress="1"></span>
           <span data-tutorial-progress="2"></span>
+          <span data-tutorial-progress="3"></span>
         </div>
 
         <div class="tutorial-layout">
@@ -291,6 +293,10 @@
                 </span>
               </div>
               <p id="tutorialTargetHint">找到颜色与形状完全相同的门牌</p>
+              <div class="protocol-rule" id="tutorialProtocolRule">
+                <strong id="tutorialTargetProtocol">常规分流</strong>
+                <span id="tutorialProtocolDescription">选择完全匹配的颜色与形状</span>
+              </div>
             </div>
 
             <div class="demo-gates" id="tutorialGateGrid">
