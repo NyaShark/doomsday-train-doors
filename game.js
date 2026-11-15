@@ -88,6 +88,89 @@
     }),
   });
 
+  const DOCTRINES = Object.freeze({
+    safety: Object.freeze({
+      id: "safety",
+      label: "守序调度",
+      threshold: 4,
+      scoreMultiplier: 1,
+      priorityEvery: 6,
+      shiftCombo: 5,
+      response: "守住通道。先让所有人活下来，再谈胜负。",
+    }),
+    standard: Object.freeze({
+      id: "standard",
+      label: "标准协议",
+      threshold: 5,
+      scoreMultiplier: 1.05,
+      priorityEvery: 6,
+      shiftCombo: 5,
+      response: "按标准协议执行。不要让情绪替你读门牌。",
+    }),
+    overdrive: Object.freeze({
+      id: "overdrive",
+      label: "抢修调度",
+      threshold: 6,
+      scoreMultiplier: 1.25,
+      priorityEvery: 5,
+      shiftCombo: 4,
+      response: "抢修主控。提高输出，也准备好承受更频繁的协议变化。",
+    }),
+  });
+
+  const STORY_LINES = Object.freeze([
+    Object.freeze({
+      speaker: "系统广播",
+      role: "TERMINAL 09 / EMERGENCY",
+      scene: "封锁前 60 秒",
+      portrait: "none",
+      text: "九号避难站即将封锁。检测到最后一班列车仍有生命信号。",
+    }),
+    Object.freeze({
+      speaker: "林澈",
+      role: "夜班调度员",
+      scene: "封锁前 52 秒",
+      portrait: "human",
+      text: "这里三年前就废弃了。为什么还有人往里开？",
+    }),
+    Object.freeze({
+      speaker: "零号",
+      role: "避难终端 AI",
+      scene: "封锁前 47 秒",
+      portrait: "ai",
+      text: "因为他们相信这扇门还会打开。林澈，你被临时授权接管三条避难轨道。",
+    }),
+    Object.freeze({
+      speaker: "林澈",
+      role: "夜班调度员",
+      scene: "封锁前 40 秒",
+      portrait: "human",
+      text: "只有三条轨道，错一次就少一个人。你确定我能做到？",
+    }),
+    Object.freeze({
+      speaker: "零号",
+      role: "避难终端 AI",
+      scene: "封锁前 34 秒",
+      portrait: "ai",
+      text: "你不需要记住所有人的脸。读取标记，执行指令，然后立刻忘掉上一轮答案。",
+    }),
+    Object.freeze({
+      speaker: "系统广播",
+      role: "INTEGRITY MONITOR",
+      scene: "封锁前 27 秒",
+      portrait: "none",
+      text: "警告：错误分流会削减生命完整度。精准分流能够积累稳定度，并生成一层应急护盾。",
+    }),
+    Object.freeze({
+      speaker: "零号",
+      role: "避难终端 AI",
+      scene: "调度方针 / CHOICE",
+      portrait: "ai",
+      text: "最后一件事。列车进站后，协议会越来越乱。你准备用什么方式守住这扇门？",
+      choice: true,
+    }),
+  ]);
+
   const dom = {
     world: document.getElementById("world"),
     timer: document.getElementById("timerValue"),
@@ -156,6 +239,21 @@
     resultRank: document.getElementById("resultRank"),
     resultRatingText: document.getElementById("resultRatingText"),
     resultStars: document.getElementById("resultStars"),
+    stabilityHud: document.getElementById("stabilityHud"),
+    stabilityValue: document.getElementById("stabilityValue"),
+    stabilityFill: document.getElementById("stabilityFill"),
+    stabilityShield: document.getElementById("stabilityShield"),
+    storyScreen: document.getElementById("storyScreen"),
+    storySceneLabel: document.getElementById("storySceneLabel"),
+    storyCharacterAi: document.getElementById("storyCharacterAi"),
+    storyCharacterHuman: document.getElementById("storyCharacterHuman"),
+    storySpeaker: document.getElementById("storySpeaker"),
+    storySpeakerRole: document.getElementById("storySpeakerRole"),
+    storyText: document.getElementById("storyText"),
+    storyChoices: document.getElementById("storyChoices"),
+    storyNextButton: document.getElementById("storyNextButton"),
+    storySkipButton: document.getElementById("storySkipButton"),
+    storyChoiceButtons: [...document.querySelectorAll("[data-doctrine]")],
     connectionWarning: document.getElementById("connectionWarning"),
   };
 
@@ -290,6 +388,7 @@
   let feedbackTimer = null;
   let feedbackToken = 0;
   let state = null;
+  let selectedDoctrineId = "standard";
   const tutorial = {
     step: 0,
     waiting: false,
@@ -298,8 +397,15 @@
     targetComboId: COMBOS[2].id,
     protocolId: "direct",
   };
+  const story = {
+    lineIndex: 0,
+    typing: false,
+    typeTimer: null,
+    typeToken: 0,
+    choiceMade: false,
+  };
 
-  function makeQueue() {
+  function makeQueue(priorityEvery = 6) {
     const queue = [];
     for (let index = 0; index < CONFIG.totalSurvivors; index += 1) {
       queue.push({
@@ -330,15 +436,18 @@
     }
 
     queue.forEach((survivor, index) => {
-      survivor.priority = (index + 1) % 6 === 0;
+      survivor.priority = (index + 1) % priorityEvery === 0;
     });
 
     return queue;
   }
 
-  function createInitialState() {
+  function createInitialState(doctrineId = "standard") {
+    const doctrine = DOCTRINES[doctrineId] || DOCTRINES.standard;
     return {
       status: "ready",
+      doctrineId: doctrine.id,
+      doctrine,
       elapsed: 0,
       remaining: CONFIG.duration,
       lives: CONFIG.startingLives,
@@ -351,11 +460,15 @@
       perfectStreak: 0,
       maxPerfectStreak: 0,
       prioritySaves: 0,
+      stability: 0,
+      shieldCharges: 0,
+      maxShieldCharges: 1,
+      shieldAbsorbs: 0,
       stage: 1,
       spawned: 0,
       nextSpawnAt: CONFIG.firstSpawnAt,
       current: null,
-      queue: makeQueue(),
+      queue: makeQueue(doctrine.priorityEvery),
       mappingRotation: 0,
       pendingMappingAt: null,
       mappingWarningCount: 0,
@@ -562,6 +675,19 @@
     dom.score.textContent = String(state.score).padStart(4, "0");
     dom.combo.textContent = String(state.combo);
     dom.multiplier.textContent = `×${currentMultiplier().toFixed(1)}`;
+    const threshold = state.doctrine.threshold;
+    const stabilityProgress = Math.min(
+      100,
+      (state.stability / threshold) * 100
+    );
+    dom.stabilityValue.textContent = `${state.stability}/${threshold}`;
+    dom.stabilityFill.style.width = `${stabilityProgress}%`;
+    dom.stabilityHud.classList.toggle(
+      "is-charged",
+      state.shieldCharges > 0
+    );
+    dom.stabilityShield.textContent =
+      state.shieldCharges > 0 ? "护盾待命" : "无护盾";
     lifeCells.forEach((cell, index) => {
       cell.classList.toggle("lost", index >= state.lives);
     });
@@ -572,9 +698,11 @@
       state.pendingMappingAt !== null ? "MAPPING UNSTABLE" : "MAPPING STABLE";
     dom.systemStateText.textContent =
       state.status === "playing"
-        ? "分流进行中"
+        ? `${state.doctrine.label} / 分流进行中`
         : state.status === "paused"
           ? "系统暂停"
+          : state.status === "story"
+            ? "序章通讯"
           : state.status === "tutorial"
             ? "训练模式"
           : state.status === "success"
@@ -734,7 +862,9 @@
       state.combo += 1;
       state.maxCombo = Math.max(state.maxCombo, state.combo);
       const multiplier = currentMultiplier();
-      const baseScore = Math.round(10 * multiplier);
+      const baseScore = Math.round(
+        10 * multiplier * state.doctrine.scoreMultiplier
+      );
       const perfectBonus = isPerfect ? CONFIG.perfectBonus : 0;
       const priorityBonus = isPriority ? CONFIG.priorityBonus : 0;
       state.score += baseScore + perfectBonus + priorityBonus;
@@ -747,6 +877,15 @@
         );
       } else {
         state.perfectStreak = 0;
+      }
+      if (isPerfect && state.shieldCharges < state.maxShieldCharges) {
+        state.stability += 1;
+        if (state.stability >= state.doctrine.threshold) {
+          state.stability = 0;
+          state.shieldCharges = 1;
+          audio.comboMilestone();
+          showFeedback("稳定度充满 / 获得 1 层应急护盾", "good", 1050);
+        }
       }
       if (isPriority) {
         state.prioritySaves += 1;
@@ -770,7 +909,10 @@
         announceStage(newStage);
       }
 
-      if (state.combo > 0 && state.combo % 5 === 0) {
+      if (
+        state.combo > 0 &&
+        state.combo % state.doctrine.shiftCombo === 0
+      ) {
         audio.comboMilestone();
         showFeedback(`COMBO ${state.combo} / 门牌即将重组`, "good", 900);
         scheduleMapping();
@@ -786,12 +928,10 @@
         return;
       }
     } else {
-      state.lives -= 1;
       state.misses += 1;
       state.combo = 0;
       state.perfectStreak = 0;
       state.lastResultReason = reason;
-      audio.miss();
       animateArrivalPanel("miss");
       shakeScreen();
       if (chosenLane >= 0) {
@@ -802,7 +942,29 @@
         target.classList.add("is-missed");
         window.setTimeout(() => target.classList.remove("is-missed"), 340);
       }
-      showFeedback(isMiss ? "漏送 / 生命完整度 -1" : "分流错误 / 生命完整度 -1", "bad", 900);
+      if (state.shieldCharges > 0) {
+        state.shieldCharges -= 1;
+        state.shieldAbsorbs += 1;
+        dom.stabilityHud.classList.remove("is-used");
+        void dom.stabilityHud.offsetWidth;
+        dom.stabilityHud.classList.add("is-used");
+        window.setTimeout(
+          () => dom.stabilityHud.classList.remove("is-used"),
+          420
+        );
+        audio.mappingWarning();
+        showFeedback("应急护盾已抵消本次失误", "good", 1000);
+      } else {
+        state.lives -= 1;
+        audio.miss();
+        showFeedback(
+          isMiss
+            ? "漏送 / 生命完整度 -1"
+            : "分流错误 / 生命完整度 -1",
+          "bad",
+          900
+        );
+      }
       if (state.lives <= 0) {
         finishGame(false, "生命完整度耗尽。");
         return;
@@ -832,12 +994,9 @@
     return true;
   }
 
-  function updateGameClock(now) {
+  function advanceSimulation(deltaSeconds) {
     if (!state || state.status !== "playing") return;
-    const frameDelta = Math.min(0.1, Math.max(0, (now - state.lastFrameAt) / 1000));
-    state.lastFrameAt = now;
-    const scaledDelta = Math.min(0.2, frameDelta * state.timeScale);
-    state.elapsed = Math.max(0, state.elapsed + scaledDelta);
+    state.elapsed = Math.max(0, state.elapsed + Math.max(0, deltaSeconds));
     state.remaining = Math.max(0, CONFIG.duration - state.elapsed);
 
     const countdownSecond = Math.ceil(state.remaining);
@@ -903,6 +1062,18 @@
     updateAll();
   }
 
+  function updateGameClock(now) {
+    if (!state || state.status !== "playing") return;
+    const frameDelta = Math.min(
+      0.1,
+      Math.max(0, (now - state.lastFrameAt) / 1000)
+    );
+    state.lastFrameAt = now;
+    advanceSimulation(
+      Math.min(0.2, frameDelta * state.timeScale)
+    );
+  }
+
   function loop(now) {
     if (state?.status === "playing") {
       updateGameClock(now);
@@ -913,6 +1084,7 @@
   }
 
   function showOnlyScreen(screenName) {
+    dom.storyScreen.hidden = screenName !== "story";
     dom.startScreen.hidden = screenName !== "start";
     dom.tutorialScreen.hidden = screenName !== "tutorial";
     dom.pauseScreen.hidden = screenName !== "pause";
@@ -920,6 +1092,7 @@
   }
 
   function resetGame() {
+    clearStoryTyping();
     window.clearTimeout(feedbackTimer);
     feedbackToken += 1;
     state = createInitialState();
@@ -927,6 +1100,135 @@
     dom.arrivalPanel.className = "arrival-panel is-idle";
     showOnlyScreen("start");
     updateAll();
+  }
+
+  function clearStoryTyping() {
+    story.typeToken += 1;
+    window.clearInterval(story.typeTimer);
+    story.typeTimer = null;
+    story.typing = false;
+  }
+
+  function updateStoryPortrait(portrait) {
+    dom.storyCharacterAi.classList.toggle(
+      "is-visible",
+      portrait === "ai"
+    );
+    dom.storyCharacterHuman.classList.toggle(
+      "is-visible",
+      portrait === "human"
+    );
+    dom.storyCharacterAi.classList.toggle("is-speaking", portrait === "ai");
+    dom.storyCharacterHuman.classList.toggle(
+      "is-speaking",
+      portrait === "human"
+    );
+  }
+
+  function finishStoryText() {
+    clearStoryTyping();
+    dom.storyText.textContent = story.fullText;
+    dom.storyText.classList.add("is-complete");
+    if (story.showChoicesWhenComplete && !story.choiceMade) {
+      dom.storyChoices.hidden = false;
+      dom.storyNextButton.hidden = true;
+    }
+  }
+
+  function typeStoryText(text, showChoices = false) {
+    clearStoryTyping();
+    story.fullText = text;
+    story.showChoicesWhenComplete = showChoices;
+    story.typing = true;
+    const token = story.typeToken;
+    let cursor = 0;
+    dom.storyText.textContent = "";
+    dom.storyText.classList.remove("is-complete");
+    dom.storyChoices.hidden = true;
+    dom.storyNextButton.hidden = false;
+    dom.storyNextButton.querySelector("span").textContent =
+      showChoices ? "继续" : "继续";
+    story.typeTimer = window.setInterval(() => {
+      if (token !== story.typeToken) return;
+      cursor += 1;
+      dom.storyText.textContent = text.slice(0, cursor);
+      if (cursor >= text.length) {
+        clearStoryTyping();
+        dom.storyText.classList.add("is-complete");
+        if (showChoices && !story.choiceMade) {
+          dom.storyChoices.hidden = false;
+          dom.storyNextButton.hidden = true;
+        }
+      }
+    }, 24);
+  }
+
+  function renderStoryLine() {
+    const line = STORY_LINES[story.lineIndex];
+    if (!line) {
+      startTutorial(selectedDoctrineId);
+      return;
+    }
+    dom.storySceneLabel.textContent = line.scene;
+    dom.storySpeaker.textContent = line.speaker;
+    dom.storySpeakerRole.textContent = line.role;
+    updateStoryPortrait(line.portrait);
+    dom.storyChoices.hidden = true;
+    dom.storyNextButton.hidden = false;
+    dom.storyNextButton.querySelector("span").textContent = "继续";
+    typeStoryText(line.text, Boolean(line.choice));
+  }
+
+  function startStory() {
+    audio.init();
+    clearStoryTyping();
+    story.lineIndex = 0;
+    story.choiceMade = false;
+    story.fullText = "";
+    selectedDoctrineId = "standard";
+    state = createInitialState(selectedDoctrineId);
+    state.status = "story";
+    showOnlyScreen("story");
+    updateAll();
+    renderStoryLine();
+  }
+
+  function completeStoryToTutorial() {
+    clearStoryTyping();
+    startTutorial(selectedDoctrineId);
+  }
+
+  function selectStoryDoctrine(doctrineId) {
+    const doctrine = DOCTRINES[doctrineId];
+    if (!doctrine) return;
+    selectedDoctrineId = doctrine.id;
+    story.choiceMade = true;
+    dom.storyChoices.hidden = true;
+    dom.storyNextButton.hidden = false;
+    dom.storyNextButton.querySelector("span").textContent = "进入训练";
+    dom.storySpeaker.textContent = "零号";
+    dom.storySpeakerRole.textContent = `${doctrine.label} / CONFIRMED`;
+    updateStoryPortrait("ai");
+    typeStoryText(
+      `${doctrine.response} 稳定度需要 ${doctrine.threshold} 次精准分流才能生成护盾。训练会确认你的读门方式。`,
+      false
+    );
+  }
+
+  function advanceStory() {
+    if (state?.status !== "story") return;
+    if (story.typing) {
+      finishStoryText();
+      return;
+    }
+    const line = STORY_LINES[story.lineIndex];
+    if (line?.choice && !story.choiceMade) return;
+    if (story.choiceMade) {
+      completeStoryToTutorial();
+      return;
+    }
+    story.lineIndex += 1;
+    renderStoryLine();
   }
 
   function setTutorialStatus(text, type = "neutral") {
@@ -1027,22 +1329,39 @@
       return;
     }
 
+    if (tutorial.step === 4) {
+      tutorial.waiting = false;
+      tutorial.complete = true;
+      dom.tutorialStepLabel.textContent = "05 / 稳定护盾";
+      dom.tutorialTitle.textContent = "精准分流会积累稳定度";
+      dom.tutorialDescription.textContent =
+        `当前方针为「${DOCTRINES[selectedDoctrineId].label}」。每 ${DOCTRINES[selectedDoctrineId].threshold} 次精准分流可生成 1 层应急护盾，自动抵消下一次失误。`;
+      dom.tutorialTip.textContent =
+        "护盾生成后，HUD 的稳定度条会变成琥珀色；护盾只能储存 1 层。";
+      dom.tutorialNextButton.hidden = false;
+      dom.tutorialNextButton.querySelector("span").textContent = "开始实战";
+      dom.tutorialTargetHint.textContent = "精准分流 → 稳定护盾";
+      dom.tutorialTargetProtocol.textContent = "稳定度";
+      dom.tutorialProtocolDescription.textContent =
+        `精准 ${DOCTRINES[selectedDoctrineId].threshold} 次 → 抵消 1 次失误`;
+      setTutorialStatus("稳定度机制已解锁，准备进入实战", "good");
+      return;
+    }
+
     tutorial.waiting = false;
     dom.tutorialStepLabel.textContent = "训练完成 / READY";
-    dom.tutorialTitle.textContent = "你已经可以进入封锁区";
-    dom.tutorialDescription.textContent =
-      "实战会加入倒计时、精准响应、优先幸存者和更快节奏。连续判断当前画面，不要记住固定位置。";
-    dom.tutorialTip.textContent =
-      "精准分流：出现幸存者后 0.45 秒内送对，可获得额外分数。";
+    dom.tutorialTitle.textContent = "准备进入封锁区";
+    dom.tutorialDescription.textContent = "继续完成五步引导后即可进入实战。";
+    dom.tutorialTip.textContent = "点击“开始实战”进入封锁倒计时。";
     dom.tutorialNextButton.hidden = false;
     dom.tutorialNextButton.querySelector("span").textContent = "开始实战";
-    dom.tutorialTargetHint.textContent = "训练完成";
-    setTutorialStatus("训练通过，准备进入封锁区", "good");
+    setTutorialStatus("准备进入封锁区", "good");
   }
 
-  function startTutorial() {
+  function startTutorial(doctrineId = selectedDoctrineId) {
     audio.init();
-    state = createInitialState();
+    selectedDoctrineId = DOCTRINES[doctrineId] ? doctrineId : "standard";
+    state = createInitialState(selectedDoctrineId);
     state.status = "tutorial";
     tutorial.step = 0;
     tutorial.waiting = false;
@@ -1094,7 +1413,8 @@
         tutorial.protocolId = "right";
         renderTutorialStep();
       } else if (tutorial.step === 3) {
-        tutorial.complete = true;
+        tutorial.step = 4;
+        tutorial.complete = false;
         renderTutorialStep();
       }
     }, 360);
@@ -1102,7 +1422,7 @@
 
   function advanceTutorial() {
     if (tutorial.complete) {
-      startGame();
+      startGame(selectedDoctrineId);
       return;
     }
     if (tutorial.waiting) return;
@@ -1112,17 +1432,22 @@
     }
   }
 
-  function startGame() {
+  function startGame(doctrineId = selectedDoctrineId) {
     audio.init();
     window.clearTimeout(feedbackTimer);
-    state = createInitialState();
+    selectedDoctrineId = DOCTRINES[doctrineId] ? doctrineId : "standard";
+    state = createInitialState(selectedDoctrineId);
     state.status = "playing";
     state.lastFrameAt = performance.now();
     showOnlyScreen(null);
     dom.feedbackBanner.className = "feedback-banner";
     dom.arrivalPanel.className = "arrival-panel";
     updateAll();
-    showFeedback("封锁倒计时开始 / 匹配门牌", "good", 1000);
+    showFeedback(
+      `${state.doctrine.label} / 封锁倒计时开始`,
+      "good",
+      1100
+    );
     if (!frameRequest) frameRequest = window.requestAnimationFrame(loop);
   }
 
@@ -1155,9 +1480,14 @@
     dom.resultIndex.textContent = isSuccess
       ? "EVACUATION REPORT / COMPLETE"
       : "EVACUATION REPORT / FAILED";
-    dom.resultKicker.textContent = isSuccess ? "GATE CYCLE COMPLETE" : "SIGNAL LOST";
+    dom.resultKicker.textContent = `${state.doctrine.label} / ${
+      isSuccess ? "GATE CYCLE COMPLETE" : "SIGNAL LOST"
+    }`;
     dom.resultTitle.textContent = isSuccess ? "撤离完成" : "封锁失败";
-    dom.resultReason.textContent = reason;
+    dom.resultReason.textContent =
+      state.shieldAbsorbs > 0
+        ? `${reason} 稳定护盾共抵消 ${state.shieldAbsorbs} 次失误。`
+        : reason;
     dom.resultCorrect.textContent = `${state.correct} / 20`;
     dom.resultScore.textContent = String(state.score).padStart(4, "0");
     dom.resultCombo.textContent = String(state.maxCombo);
@@ -1220,6 +1550,21 @@
       return;
     }
 
+    if (state.status === "story") {
+      if (event.key === "Enter" || event.code === "Space") {
+        event.preventDefault();
+        if (
+          !story.typing &&
+          STORY_LINES[story.lineIndex]?.choice &&
+          !story.choiceMade
+        ) {
+          return;
+        }
+        advanceStory();
+      }
+      return;
+    }
+
     if (["1", "2", "3"].includes(event.key)) {
       event.preventDefault();
       if (state.status === "tutorial") {
@@ -1235,7 +1580,7 @@
       if (state.status === "playing" || state.status === "paused") {
         pauseGame();
       } else if (state.status === "ready") {
-        startTutorial();
+        startStory();
       } else if (state.status === "tutorial") {
         advanceTutorial();
       } else if (state.status === "success" || state.status === "failure") {
@@ -1258,8 +1603,18 @@
         chooseLane(Number(gate.dataset.lane));
       });
     });
-    dom.startButton.addEventListener("click", startTutorial);
-    dom.directStartButton.addEventListener("click", startGame);
+    dom.startButton.addEventListener("click", startStory);
+    dom.directStartButton.addEventListener("click", () => {
+      selectedDoctrineId = "standard";
+      startTutorial(selectedDoctrineId);
+    });
+    dom.storyNextButton.addEventListener("click", advanceStory);
+    dom.storySkipButton.addEventListener("click", completeStoryToTutorial);
+    dom.storyChoiceButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        selectStoryDoctrine(button.dataset.doctrine);
+      });
+    });
     dom.tutorialNextButton.addEventListener("click", advanceTutorial);
     dom.tutorialSkipButton.addEventListener("click", startGame);
     dom.tutorialRestartButton.addEventListener("click", () => {
@@ -1277,7 +1632,11 @@
     dom.soundButton.addEventListener("click", toggleSound);
     document.addEventListener("keydown", handleKeyboard);
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden && state?.status === "playing") {
+      if (
+        !window.__DOOM_TEST_MODE__ &&
+        document.hidden &&
+        state?.status === "playing"
+      ) {
         pauseGame();
       }
     });
@@ -1291,6 +1650,10 @@
         restart: startGame,
         getState: () => ({
           status: state.status,
+          doctrineId: state.doctrine.id,
+          stability: state.stability,
+          shieldCharges: state.shieldCharges,
+          shieldAbsorbs: state.shieldAbsorbs,
           elapsed: state.elapsed,
           remaining: state.remaining,
           lives: state.lives,
@@ -1323,6 +1686,12 @@
           timeScale: state.timeScale,
         }),
         chooseLane,
+        step: (seconds) => {
+          const numeric = Number(seconds);
+          if (Number.isFinite(numeric) && numeric > 0) {
+            advanceSimulation(numeric);
+          }
+        },
         setTimeScale: (scale) => {
           const numeric = Number(scale);
           if (Number.isFinite(numeric) && numeric > 0 && numeric <= 20) {

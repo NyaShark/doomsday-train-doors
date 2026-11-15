@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 920">
+  <defs>
+    <linearGradient id="holoBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4d8e8a" stop-opacity=".08"/>
+      <stop offset=".55" stop-color="#4d8e8a" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#d49c3e" stop-opacity=".12"/>
+    </linearGradient>
+    <radialGradient id="coreGlow">
+      <stop offset="0" stop-color="#d8d0c0" stop-opacity=".9"/>
+      <stop offset=".2" stop-color="#4d8e8a" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#4d8e8a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="scan" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d8d0c0" stop-opacity="0"/>
+      <stop offset=".48" stop-color="#d8d0c0" stop-opacity=".44"/>
+      <stop offset=".52" stop-color="#4d8e8a" stop-opacity=".1"/>
+      <stop offset="1" stop-color="#4d8e8a" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="16" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="bodyClip">
+      <path d="M131 920c15-168 48-291 106-368 30-39 73-62 123-62s94 23 124 62c58 77 90 200 105 368Z"/>
+    </clipPath>
+  </defs>
+  <g opacity=".96">
+    <ellipse cx="310" cy="352" rx="235" ry="270" fill="url(#coreGlow)" opacity=".38" filter="url(#glow)"/>
+    <path d="M131 920c15-168 48-291 106-368 30-39 73-62 123-62s94 23 124 62c58 77 90 200 105 368Z" fill="url(#holoBody)" stroke="#4d8e8a" stroke-opacity=".48" stroke-width="3"/>
+    <g clip-path="url(#bodyClip)" opacity=".75">
+      <path d="M80 485h460v24H80zM80 570h460v18H80zM80 665h460v25H80zM80 760h460v18H80zM80 855h460v22H80z" fill="url(#scan)"/>
+      <path d="M170 410l390 330M128 520l355 295M125 700l300 205" stroke="#4d8e8a" stroke-opacity=".18" stroke-width="2"/>
+    </g>
+    <circle cx="310" cy="267" r="132" fill="#0b1111" stroke="#4d8e8a" stroke-opacity=".8" stroke-width="4"/>
+    <circle cx="310" cy="267" r="104" fill="none" stroke="#d8d0c0" stroke-opacity=".25" stroke-width="2" stroke-dasharray="8 13"/>
+    <circle cx="310" cy="267" r="72" fill="#4d8e8a" opacity=".11" filter="url(#glow)"/>
+    <path d="M310 187v160M230 267h160" stroke="#d8d0c0" stroke-opacity=".55" stroke-width="3"/>
+    <circle cx="310" cy="267" r="24" fill="#d8d0c0" fill-opacity=".8" filter="url(#glow)"/>
+    <path d="M211 228c20-33 48-57 84-70M409 228c-20-33-48-57-84-70" fill="none" stroke="#d49c3e" stroke-opacity=".65" stroke-width="5" stroke-linecap="square"/>
+    <path d="M204 340c58 23 155 23 213 0" fill="none" stroke="#4d8e8a" stroke-opacity=".7" stroke-width="4"/>
+    <path d="M206 374c69 19 139 19 208 0" fill="none" stroke="#d8d0c0" stroke-opacity=".25" stroke-width="2"/>
+    <path d="M188 456h244v5H188zM211 500h198v4H211zM229 548h162v3H229z" fill="#d8d0c0" opacity=".1"/>
+    <g fill="#4d8e8a" opacity=".55">
+      <circle cx="176" cy="421" r="4"/><circle cx="192" cy="421" r="4"/><circle cx="208" cy="421" r="4"/>
+      <circle cx="427" cy="421" r="4"/><circle cx="443" cy="421" r="4"/><circle cx="459" cy="421" r="4"/>
+    </g>
+    <text x="310" y="704" text-anchor="middle" fill="#4d8e8a" fill-opacity=".7" font-family="Bahnschrift, sans-serif" font-size="18" letter-spacing="10">CONTROL AI / ZERO</text>
+    <text x="310" y="737" text-anchor="middle" fill="#d8d0c0" fill-opacity=".28" font-family="Bahnschrift, sans-serif" font-size="11" letter-spacing="5">EVACUATION TERMINAL 09</text>
+    <path d="M310 790v92" stroke="#4d8e8a" stroke-opacity=".25" stroke-width="2"/>
+    <circle cx="310" cy="790" r="5" fill="#d49c3e" opacity=".8"/>
+  </g>
+</svg>

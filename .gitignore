@@ -1,6 +1,7 @@
 .build/
 .chrome-profile*/
 .edge-headless*/
+.edge-test-*/
 *.log
 Thumbs.db
 .DS_Store

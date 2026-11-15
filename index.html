@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#0b0e0e">
   <meta name="description" content="末日车门：30 秒内读取避难门映射，将幸存者送向正确轨道的反应分轨游戏。">
   <title>末日车门 | DOOMSDAY TRAIN DOORS</title>
-  <link rel="icon" href="favicon.svg?v=1.4" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.4">
-  <script src="game.js?v=1.4" defer></script>
+  <link rel="icon" href="favicon.svg?v=1.5" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=1.5">
+  <script src="game.js?v=1.5" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#gameStage">跳到游戏区域</a>
@@ -84,6 +84,11 @@
           <div>
             <span class="hud-kicker">COMBO</span>
             <strong><span id="comboValue">0</span><small id="multiplierValue">×1.0</small></strong>
+          </div>
+          <div class="stability-hud" id="stabilityHud">
+            <span class="hud-kicker">STABILITY <b id="stabilityValue">0/5</b></span>
+            <div class="stability-meter" aria-hidden="true"><span id="stabilityFill"></span></div>
+            <small id="stabilityShield">无护盾</small>
           </div>
         </div>
       </section>
@@ -218,6 +223,56 @@
       </footer>
     </main>
 
+    <section class="screen screen-story" id="storyScreen" aria-labelledby="storySpeaker" hidden>
+      <div class="story-background" aria-hidden="true"></div>
+      <div class="story-vignette" aria-hidden="true"></div>
+      <header class="story-header">
+        <div>
+          <span class="eyebrow">PROLOGUE / TERMINAL 09</span>
+          <strong id="storySceneLabel">封锁前 60 秒</strong>
+        </div>
+        <button class="story-skip" id="storySkipButton" type="button">跳过序章</button>
+      </header>
+
+      <div class="story-characters" aria-hidden="true">
+        <div class="story-character story-character-ai is-visible" id="storyCharacterAi">
+          <img src="assets/story-ai.svg" alt="">
+        </div>
+        <div class="story-character story-character-human" id="storyCharacterHuman">
+          <img src="assets/story-dispatcher.svg" alt="">
+        </div>
+      </div>
+
+      <div class="story-dialogue" id="storyDialogue">
+        <div class="story-name-row">
+          <strong id="storySpeaker">零号</strong>
+          <span id="storySpeakerRole">避难终端 AI</span>
+        </div>
+        <p class="story-text" id="storyText"></p>
+        <div class="story-choices" id="storyChoices" hidden>
+          <button class="story-choice" type="button" data-doctrine="safety">
+            <strong>守住通道</strong>
+            <span>稳定度 4 点成型，优先保护撤离稳定</span>
+          </button>
+          <button class="story-choice" type="button" data-doctrine="standard">
+            <strong>相信终端</strong>
+            <span>按标准协议执行，稳定度 5 点成型</span>
+          </button>
+          <button class="story-choice" type="button" data-doctrine="overdrive">
+            <strong>赌一次抢修</strong>
+            <span>得分效率更高，但协议变化更频繁</span>
+          </button>
+        </div>
+        <div class="story-footer">
+          <button class="story-next-button" id="storyNextButton" type="button">
+            <span>继续</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+          </button>
+          <span class="story-control-hint">点击继续 / Enter</span>
+        </div>
+      </div>
+    </section>
+
     <section class="screen screen-start" id="startScreen" aria-labelledby="startTitle">
       <div class="screen-panel">
         <span class="screen-index">EVAC / 09</span>
@@ -231,7 +286,7 @@
           <div><strong>30</strong><span>秒内完成分流</span></div>
         </div>
 
-        <p class="start-warning"><span aria-hidden="true"></span>门牌映射会在连击与阶段变化时重新排列。</p>
+        <p class="start-warning"><span aria-hidden="true"></span>序章选择会改变调度方针；精准分流可积累稳定护盾。</p>
         <div class="start-missions" aria-label="单局挑战目标">
           <span>撤离 20 名</span>
           <span>达成 10 连击</span>
@@ -239,10 +294,10 @@
         </div>
         <div class="start-actions">
           <button class="primary-button" id="startButton" type="button">
-            <span>开始新手训练</span>
+            <span>进入序章</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
           </button>
-          <button class="secondary-button" id="directStartButton" type="button">直接开始</button>
+          <button class="secondary-button" id="directStartButton" type="button">跳过剧情并训练</button>
         </div>
         <p class="screen-footnote">点击轨道操作，也支持数字键 1 / 2 / 3</p>
       </div>
@@ -252,7 +307,7 @@
       <div class="screen-panel tutorial-panel">
         <div class="tutorial-heading">
           <div>
-            <span class="screen-index">EVACUATION TRAINING / 04 STEPS</span>
+            <span class="screen-index">EVACUATION TRAINING / 05 STEPS</span>
             <p class="screen-kicker">READ THE SIGNAL BEFORE THE DOOR CLOSES</p>
             <h2>分流训练</h2>
           </div>
@@ -264,6 +319,7 @@
           <span data-tutorial-progress="1"></span>
           <span data-tutorial-progress="2"></span>
           <span data-tutorial-progress="3"></span>
+          <span data-tutorial-progress="4"></span>
         </div>
 
         <div class="tutorial-layout">
